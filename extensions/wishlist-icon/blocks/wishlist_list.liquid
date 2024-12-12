@@ -1,0 +1,140 @@
+<style>
+	.wishlist-container {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-around;
+		padding: 20px;
+	}
+	.wishlist-item {
+		background-color: #f9f9f9;
+		border: 1px solid #ddd;
+		border-radius: 8px;
+		margin: 10px;
+		padding: 15px;
+		width: calc(33% - 40px);
+		box-sizing: border-box;
+		transition: transform 0.3s;
+	}
+	.wishlist-item:hover {
+		transform: scale(1.05);
+	}
+	.wishlist-item img {
+		max-width: 100%;
+		border-radius: 5px;
+	}
+	.remove-button {
+		background-color: #ff4d4d;
+		color: white;
+		border: none;
+		border-radius: 4px;
+		padding: 10px 15px;
+		cursor: pointer;
+		margin-top: 10px;
+	}
+	.remove-button:hover {
+		background-color: #ff1a1a;
+	}
+	@media (max-width: 768px) {
+		.wishlist-item {
+		width: calc(50% - 40px);
+		}
+	}
+	@media (max-width: 480px) {
+		.wishlist-item {
+		width: 100%;
+		}
+	}
+</style>
+
+<h1>{{ block.settings.heading }}</h1>
+
+{% if customer %}
+	<div class="wishlist-container">
+		{% comment %} <div class="wishlist-item">
+		<h3>Product Name</h3>
+		<p>$Product Price</p>
+		<button class="remove-button">Remove from Wishlist</button>
+		</div> {% endcomment %}
+		<span id="noWishlist">No products in wishlist</span>
+	</div>
+{% else %}
+	<p>Sign in to view your wishlist.</p>
+	<a href="{{ routes.account_login_url }}">Sign in</a>
+{% endif %}
+
+<script>
+    let apiUrl = 'https://anxiety-readily-dirt-relaxation.trycloudflare.com';
+
+    function makeWishlistGetApiCall() {
+        fetch(`${apiUrl}/api/getcustomerwishlist?customerId={{ customer.id }}&shop={{ shop.url }}`)
+            .then(response => response.json())
+            .then(result => {
+                if (result && result?.wishlist?.length > 0) {
+                    jQuery('#noWishlist').hide();
+                    result.wishlist.forEach((item) => {
+                        let wishlistItem = `
+                            <div class="wishlist-item">
+                                <h3>${item.productName}</h3>
+                                <button class="remove-button" product-id="${item.productId}" product-name="${item.productName}">Remove from Wishlist</button>
+                            </div>
+                        `;
+                        jQuery('.wishlist-container').append(wishlistItem);
+                    });
+                } else {
+					jQuery('#noWishlist').show();
+				}
+            })
+            .catch(error => console.log('error', error));
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        {% if customer %}
+            makeWishlistGetApiCall();
+        {% endif %}
+
+        document.addEventListener('click', function (event) {
+            if (event.target.classList.contains('remove-button')) {
+                let productId = event.target.getAttribute('product-id');
+                let productName = event.target.getAttribute('product-name');
+                let body = {
+                    customerId: "{{ customer.id }}",
+                    customerName: "{{ customer.name }}",
+                    productId: productId,
+                    productName: productName,
+                    shop: "{{ shop.url }}",
+                    _action: "DELETE"
+                }
+                let requestOptions = {
+                    method: 'POST',
+                    body: JSON.stringify(body)
+                }
+                fetch(`${apiUrl}/api/wishlist`, requestOptions)
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result && result.removed && result.wishlist == false) {
+                            event.target.closest('.wishlist-item').remove();
+							if (result.wishlistCount == 0) {
+								jQuery('#noWishlist').show();
+							}
+                        }
+                    })
+                    .catch(error => console.log('error', error));
+            }
+        });
+    });
+</script>
+
+{% schema %}
+{
+  "name": "Wishlist List",
+  "target": "section",
+  "settings": [
+		{
+			"type": "text",
+			"id": "heading",
+			"label": "Heading",
+			"default": "My Wishlist"
+		}
+  ]
+}
+{% endschema %}

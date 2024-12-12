@@ -1,0 +1,154 @@
+<div class="wishlist-icon">
+    <button type="button" class="wishlist">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" stroke="{{ block.settings.colour }}" stroke-width="15" fill="#fff" wishlisted="false">
+            <path d="M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8c0-69.9-50.5-129.5-119.4-141C347 36.5 300.6 51.4 268 84L256 96 244 84c-32.6-32.6-79-47.5-124.6-39.9C50.5 55.6 0 115.2 0 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z"/>
+        </svg>
+        {% if block.settings.button_text != blank %}
+            <span class="sr-only">{{ block.settings.button_text }}</span>
+        {% endif %}
+    </button>
+</div>
+
+<style>
+    .wishlist-icon {
+        display: inline-block;
+        margin: 0;
+        padding: 0;
+    }
+
+    .wishlist-icon button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .wishlist-icon svg {
+        height: 25px;
+        width: 30px;
+    }
+
+    /* .wishlist-icon button span {
+        position: absolute;
+        clip: rect(1px, 1px, 1px, 1px);
+        padding: 0;
+        border: 0;
+        height: 1px;
+        width: 1px;
+        overflow: hidden;
+    } */
+</style>
+
+<script>
+    let apiUrl = 'https://anxiety-readily-dirt-relaxation.trycloudflare.com';
+
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+        }
+    }
+
+    function makeWishlistPostDeleteApiCall() {
+        {% unless customer %}
+            alert('Please sign in to add products to your wishlist');
+            return false;
+        {% endunless %}
+
+        let blockColor = '{{ block.settings.colour }}';
+
+        let body = {
+            customerId: "{{ customer.id }}",
+            customerName: "{{ customer.name }}",
+            productId: "{{ product.id }}",
+            productName: "{{ product.title }}",
+            shop: "{{ shop.url }}"
+        }
+
+        if ( jQuery('.wishlist svg').attr('wishlisted') == 'false' ) {
+            body._action = "CREATE";
+        } else {
+            body._action = "DELETE";
+        }
+
+        let requestOptions = {
+            method: 'POST',
+            body: JSON.stringify(body)
+        }
+
+        if ( jQuery('.wishlist svg').attr('wishlisted') == 'true' ) {
+            requestOptions.method = 'DELETE';
+        }
+
+        fetch(`${apiUrl}/api/wishlist`, requestOptions)
+            .then(data => data.json())
+            .then(response => {
+                if (response && response?.wishlist) {
+                    jQuery('.wishlist svg').attr('wishlisted', true);
+                    jQuery('.wishlist svg').attr('fill', blockColor);
+                } else if (response && response?.wishlist == false) {
+                    jQuery('.wishlist svg').attr('wishlisted', false);
+                    jQuery('.wishlist svg').attr('fill', '#fff');
+                }
+            })
+            .catch(error => console.log('error', error));
+    }
+
+    function makeWishlistGetApiCall() {
+        fetch(`${apiUrl}/api/wishlist?customerId={{ customer.id }}&productId={{ product.id }}&shop={{ shop.url }}`)
+            .then(response => response.json())
+            .then(result => {
+                if (result && result?.wishlist?.length > 0) {
+                    jQuery('.wishlist svg').attr('wishlisted', true);
+                    jQuery('.wishlist svg').attr('fill', '{{ block.settings.colour }}');
+                }
+            })
+            .catch(error => console.log('error', error));
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+        {% if customer %}
+            makeWishlistGetApiCall();
+        {% endif %}
+
+        const debounceDelay = 500; // 500 milliseconds = 0.5 seconds
+        const debouncedWishlistProductApiCall = debounce(makeWishlistPostDeleteApiCall, debounceDelay);
+
+        jQuery('.wishlist').on('click', debouncedWishlistProductApiCall);
+
+    });
+</script>
+
+{% schema %}
+{
+    "name": "Wishlist Icon",
+    "target": "section",
+    "settings": [
+        {
+            "type": "product",
+            "id": "product",
+            "label": "product",
+            "autofill": true
+        },
+        {
+            "type": "text",
+            "id": "button_text",
+            "label": "Button Text",
+            "default": "Add to Wishlist"
+        },
+        {
+            "type": "color",
+            "id": "colour",
+            "label": "Heart Colour",
+            "default": "#ff0000"
+        }
+    ]
+}
+{% endschema %}
